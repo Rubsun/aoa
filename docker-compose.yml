@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID}
+    volumes:
+      - .:/app  # Монтируем текущую директорию в /app контейнера
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge

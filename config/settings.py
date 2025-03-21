@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
 
 
@@ -6,7 +8,7 @@ class Settings(BaseSettings):
     ADMIN_CHAT_ID: str
 
     class Config:
-        env_file = '/home/maksim/PycharmProjects/changer_bot/config/.env'
+        env_file = Path(__file__).resolve().parent.parent / ".env"
 
 
 settings = Settings()
