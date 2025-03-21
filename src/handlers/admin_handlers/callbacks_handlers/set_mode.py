@@ -16,7 +16,6 @@ async def change_mode(callback: CallbackQuery):
     else:
         btn = [InlineKeyboardButton(text='Переключить на ручной режим', callback_data='set_mode_manual')]
 
-
     kb = InlineKeyboardMarkup(inline_keyboard=[
         btn,
         [InlineKeyboardButton(text='Изменить курс ручного режима', callback_data='set_course')]

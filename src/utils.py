@@ -1,92 +1,95 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from config.settings import settings
-from db.models import ExchangeSettings, User
+from db.models import Order, ExchangeSettings, User
 
 
 def round_amount(amount: int) -> int:
     return (amount // 100) * 100
 
 
-async def full_calculation(user_id: int, amount: int, currency: str, bot):
-    exchange_settings = ExchangeSettings.get()
+def round_value(value, precision=2):
+    return value.quantize(Decimal('1.' + '0' * precision), rounding=ROUND_HALF_UP)
 
-    if exchange_settings.mode == 'auto':
-        USDT_TO_RUB_RATE = 91  # Примерный курс с Bybit
-        USDT_TO_THB_RATE = 33.765  # Примерный курс с тайской биржи (с учётом комиссии)
-    else:
-        USDT_TO_RUB_RATE = exchange_settings.rub_to_usdt
-        USDT_TO_THB_RATE = exchange_settings.thb_to_usdt
 
-    # Курсы между валютами
-    real_rate = USDT_TO_RUB_RATE / USDT_TO_THB_RATE  # Реальный курс (RUB -> THB)
-    client_rate = real_rate * 1.04  # Наценка для клиента
-    reverse_rate = real_rate * 0.95  # Обратный курс
+async def full_calculation(order_id: int, bot):
+    try:
+        # Получаем данные заказа и пользователя
+        order = Order.get_by_id(order_id)
+        user = User.get(User.user_id == order.user_id)
 
-    # Перевод в нужные валюты в зависимости от валюты клиента
-    user = User.get(user_id=user_id)
-    message_text = f"@{user.username} ({user_id}) запрашивает расчет для {amount} {currency}\n\n"
+        # Получаем актуальные настройки обмена
+        exchange_settings = ExchangeSettings.get()
 
-    if currency == "THB":
-        thb_to_usdt = amount / USDT_TO_THB_RATE
-        thb_to_rub = thb_to_usdt * USDT_TO_RUB_RATE
+        # Определяем базовые курсы
+        if exchange_settings.mode == 'auto':
+            base_rates = {
+                'USDT/RUB': Decimal('91.0'),
+                'USDT/THB': Decimal('33.765'),
+            }
+        else:
+            base_rates = {
+                'USDT/RUB': Decimal(str(exchange_settings.rub_to_usdt)),
+                'USDT/THB': Decimal(str(exchange_settings.thb_to_usdt)),
+            }
 
-        thb_to_usdt = round(thb_to_usdt, 2)
-        thb_to_rub = round(thb_to_rub, 2)
+        base_rates['RUB/THB'] = base_rates['USDT/THB'] / base_rates['USDT/RUB']
+        base_rates['THB/RUB'] = Decimal(1) / base_rates['RUB/THB']
+        base_rates['RUB/USDT'] = Decimal(1) / base_rates['USDT/RUB']
+        base_rates['THB/USDT'] = Decimal(1) / base_rates['USDT/THB']
 
-        client_total = round(amount * client_rate, 2)
-        real_total = round(amount * real_rate, 2)
-        profit = round(client_total - real_total, 2)
+        # Наценки и коэффициенты
+        markup = Decimal(1 + exchange_settings.markup_percentage / 100)
+        discount = Decimal('0.95')
 
-        message_text += (
-            f"Курс для клиента (THB): {round(client_rate, 3)} ({round(client_total / amount, 2)} ₽)\n"
-            f"Реальный курс: {round(real_rate, 3)} ({round(real_total / amount, 2)} ₽)\n"
-            f"Обратный курс: {round(reverse_rate, 3)} ({round(reverse_rate * amount, 2)} ₽)\n\n"
-            f"Сумма для клиента: {client_total} ₽\n"
-            f"Сумма реальная: {real_total} ₽\n\n"
-            f"Зарабатываем с этого: {profit} ₽\n"
+        # Основные параметры
+        amount = Decimal(str(order.amount))
+        currency = order.currency
+
+        conversion_results = {}
+        if currency == 'RUB':
+            conversion_results['USDT'] = amount * base_rates['RUB/USDT']
+            conversion_results['THB'] = amount * base_rates['RUB/THB']
+            client_total = amount * markup
+        elif currency == 'THB':
+            conversion_results['USDT'] = amount * base_rates['THB/USDT']
+            conversion_results['RUB'] = amount * base_rates['THB/RUB']
+            client_total = conversion_results['RUB'] * markup
+        elif currency == 'USDT':
+            conversion_results['RUB'] = amount * base_rates['USDT/RUB']
+            conversion_results['THB'] = amount * base_rates['USDT/THB']
+            client_total = conversion_results['RUB'] * markup
+        else:
+            raise ValueError(f"Неподдерживаемая валюта: {currency}")
+
+        real_total = conversion_results.get('RUB', amount)
+        profit = client_total - real_total
+        estimated_profit = profit * discount
+
+        message_text = (
+                f"📊 <b>Полный расчет заказа #{order_id}</b>\n"
+                f"👤 Клиент: {user.username} ({user.user_id})\n"
+                f"💱 Валюта: {currency}\n"
+                f"💵 Сумма: {amount} {currency}\n"
+                f"📅 Дата: {order.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"
+                f"💸 <b>Финансовые показатели:</b>\n\n"
+                f"Для клиента: {round_value(client_total)} RUB\n"
+                f"Реальная стоимость: {round_value(real_total)} RUB\n"
+                f"Прибыль: +{round_value(profit)} RUB\n"
+                f"Примерная прибыль: +{round_value(estimated_profit)} RUB\n\n"
+                f"📈 <b>Курсы обмена:</b>\n"
+                f"Клиентский: {round_value(base_rates['USDT/RUB'] * markup, 3)} RUB/USDT\n"
+                f"Рыночный: {round_value(base_rates['USDT/RUB'] / base_rates['USDT/THB'], 3)} RUB/THB\n"
+                f"Обратный: {round_value(base_rates['USDT/RUB'] * discount / base_rates['USDT/THB'], 3)} RUB/THB\n\n"
+                f"🔀 <b>Конверсии:</b>\n"
+                + "\n".join([f"• {amount} {currency} → {round_value(v)} {k}" for k, v in conversion_results.items()])
         )
 
-    elif currency == "RUB":
-        rub_to_usdt = amount * (1 / USDT_TO_RUB_RATE)
-        rub_to_thb = rub_to_usdt * USDT_TO_THB_RATE
-
-        rub_to_usdt = round(rub_to_usdt, 2)
-        rub_to_thb = round(rub_to_thb, 2)
-
-        client_total = round(amount * client_rate, 2)
-        real_total = round(amount * real_rate, 2)
-        profit = round(client_total - real_total, 2)
-
-        message_text += (
-            f"Курс для клиента (RUB): {round(client_rate, 3)} ({round(client_total / amount, 2)} ₽)\n"
-            f"Реальный курс: {round(real_rate, 3)} ({round(real_total / amount, 2)} ₽)\n"
-            f"Обратный курс: {round(reverse_rate, 3)} ({round(reverse_rate * amount, 2)} ₽)\n\n"
-            f"Сумма для клиента: {client_total} ₽\n"
-            f"Сумма реальная: {real_total} ₽\n\n"
-            f"Зарабатываем с этого: {profit} ₽\n"
-        )
-
-    elif currency == "USDT":
-        usdt_to_rub = amount * USDT_TO_RUB_RATE
-        usdt_to_thb = amount * USDT_TO_THB_RATE
-
-        usdt_to_rub = round(usdt_to_rub, 2)
-        usdt_to_thb = round(usdt_to_thb, 2)
-
-        client_total = round(amount * client_rate, 2)
-        real_total = round(amount * real_rate, 2)
-        profit = round(client_total - real_total, 2)
-
-        message_text += (
-            f"Курс для клиента (USDT): {round(client_rate, 3)} ({round(client_total / amount, 2)} ₽)\n"
-            f"Реальный курс: {round(real_rate, 3)} ({round(real_total / amount, 2)} ₽)\n"
-            f"Обратный курс: {round(reverse_rate, 3)} ({round(reverse_rate * amount, 2)} ₽)\n\n"
-            f"Сумма для клиента: {client_total} ₽\n"
-            f"Сумма реальная: {real_total} ₽\n\n"
-            f"Зарабатываем с этого: {profit} ₽\n"
-        )
-
-    else:
-        await bot.send_message(user_id, "Не поддерживаемая валюта для расчета.")
-        return
-
-    await bot.send_message(settings.ADMIN_CHAT_ID, message_text)
+        await bot.send_message(chat_id=settings.ADMIN_CHAT_ID, text=message_text, parse_mode="HTML")
+    except Order.DoesNotExist:
+        await bot.send_message(settings.ADMIN_CHAT_ID, f"❌ Заказ #{order_id} не найден!")
+    except User.DoesNotExist:
+        await bot.send_message(settings.ADMIN_CHAT_ID, f"❌ Пользователь для заказа #{order_id} не найден!")
+    except Exception as e:
+        await bot.send_message(settings.ADMIN_CHAT_ID, f"⚠️ Ошибка расчета: {str(e)}")
+        raise

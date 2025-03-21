@@ -17,12 +17,12 @@ from src.schedule import scheduler
 
 
 async def start_polling():
-
     if not ExchangeSettings.select().exists():
         ExchangeSettings.create()
 
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
+    # dp.update.middleware(BanMiddleware())
     setup_dp(dp)
     setup_bot(bot)
 

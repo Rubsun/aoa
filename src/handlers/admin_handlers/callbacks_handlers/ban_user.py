@@ -49,4 +49,3 @@ async def unban_user(callback: CallbackQuery):
 
     else:
         await callback.message.answer('Пользователь не найден')
-    

@@ -13,7 +13,6 @@ async def cmd_start(message: Message):
         defaults={'username': message.from_user.username, 'chat_id': message.chat.id}
     )
 
-
     txt = 'Что вы хотите сделать?'
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
