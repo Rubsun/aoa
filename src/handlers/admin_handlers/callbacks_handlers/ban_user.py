@@ -2,10 +2,11 @@ from aiogram import F
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from db.models import User
+from src.filters.isAdmin import IsAdmin
 from src.handlers.admin_handlers.callbacks_handlers.router import router
 
 
-@router.callback_query(F.data.startswith('ban_'))
+@router.callback_query(F.data.startswith('ban_'), IsAdmin())
 async def ban_user(callback: CallbackQuery):
     user_id = callback.data.split("_")[1]
     user = User.get(user_id=user_id)
@@ -28,7 +29,7 @@ async def ban_user(callback: CallbackQuery):
         await callback.message.answer('Пользователь не найден')
 
 
-@router.callback_query(F.data.startswith('unban_'))
+@router.callback_query(F.data.startswith('unban_'), IsAdmin())
 async def unban_user(callback: CallbackQuery):
     user_id = callback.data.split("_")[1]
     user = User.get(user_id=user_id)

@@ -2,10 +2,11 @@ from aiogram import F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from db.models import ExchangeSettings
+from src.filters.isAdmin import IsAdmin
 from src.handlers.admin_handlers.callbacks_handlers.router import router
 
 
-@router.callback_query(F.data.startswith(f'set_mode_'))
+@router.callback_query(F.data.startswith(f'set_mode_'), IsAdmin())
 async def change_mode(callback: CallbackQuery):
     mode = callback.data.split('_')[2]
     exchange_settings = ExchangeSettings.get()

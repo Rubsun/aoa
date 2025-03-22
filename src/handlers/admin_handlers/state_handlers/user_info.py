@@ -4,11 +4,12 @@ from aiogram.types import Message
 from peewee import DoesNotExist  # Импортируем исключение для проверки отсутствия записи
 
 from db.models import User
+from src.filters.isAdmin import IsAdmin
 from src.handlers.admin_handlers.state_handlers.router import router
 from src.states.admin_states.cmd_user import GetUserState
 
 
-@router.message(GetUserState.waiting_for_username_or_id)
+@router.message(GetUserState.waiting_for_username_or_id, IsAdmin())
 async def waiting_for_username_or_id(message: Message, state: FSMContext):
     input_data = message.text.strip()
 
@@ -38,5 +39,6 @@ async def waiting_for_username_or_id(message: Message, state: FSMContext):
             f"Статус пользователя @{user.username} ({user.user_id}):\n{banned_status}",
             reply_markup=keyboard
         )
+        await state.clear()
     else:
         await message.answer("Пользователь не найден. Пожалуйста, попробуйте снова.")

@@ -2,10 +2,11 @@ from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from db.models import ExchangeSettings
+from src.filters.isAdmin import IsAdmin
 from src.handlers.admin_handlers.commands_handlers.router import router
 
 
-@router.message(Command('set_mode'))
+@router.message(Command('set_mode'), IsAdmin())
 async def cmd_set_mode(message: Message):
     exchange_settings = ExchangeSettings.get()
 

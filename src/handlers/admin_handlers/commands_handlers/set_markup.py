@@ -1,16 +1,13 @@
-from decimal import Decimal
-
+from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from db.models import ExchangeSettings
+from src.filters.isAdmin import IsAdmin
 from src.handlers.admin_handlers.commands_handlers.router import router
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.filters.command import Command
-
-from src.states.admin_states.change_markup import ChangeMarkupState
 
 
-@router.message(Command("set_markup"))
+@router.message(Command("set_markup"), IsAdmin())
 async def set_markup(message: Message, state: FSMContext):
     settings = ExchangeSettings.get()
     txt = f'Текущая наценка: {settings.markup_percentage}%'

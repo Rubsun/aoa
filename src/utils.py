@@ -24,8 +24,8 @@ async def full_calculation(order_id: int, bot):
         # Определяем базовые курсы
         if exchange_settings.mode == 'auto':
             base_rates = {
-                'USDT/RUB': Decimal('91.0'),
-                'USDT/THB': Decimal('33.765'),
+                'USDT/RUB': Decimal(str(exchange_settings.auto_rub_to_usdt)),
+                'USDT/THB': Decimal(str(exchange_settings.auto_thb_to_usdt)),
             }
         else:
             base_rates = {

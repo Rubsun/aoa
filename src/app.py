@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from apscheduler.triggers.interval import IntervalTrigger
 
 from config.settings import settings
 from db.models import ExchangeSettings
@@ -13,7 +14,8 @@ from src.handlers.admin_handlers.state_handlers.router import router as admin_st
 from src.handlers.user_handlers.callbacks_handlers.router import router as user_callbacks_router
 from src.handlers.user_handlers.commands_handlers.router import router as user_commands_router
 from src.handlers.user_handlers.states_handlers.router import router as user_states_router
-from src.schedule import scheduler
+from src.middlewares.ban_middleware import BanMiddleware
+from src.schedule import scheduler, update_exchange_rates
 
 
 async def start_polling():
@@ -22,7 +24,8 @@ async def start_polling():
 
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
-    # dp.update.middleware(BanMiddleware())
+    dp.update.middleware(BanMiddleware())
+
     setup_dp(dp)
     setup_bot(bot)
 
@@ -32,6 +35,13 @@ async def start_polling():
     dp.include_router(user_callbacks_router)
     dp.include_router(user_states_router)
     dp.include_router(admin_callbacks_router)
+
+    scheduler.add_job(
+        update_exchange_rates,
+        trigger=IntervalTrigger(minutes=1),
+        id='exchange_rate_update',
+        replace_existing=True
+    )
 
     scheduler.start()
 

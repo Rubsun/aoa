@@ -2,11 +2,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 
 from db.models import ExchangeSettings
+from src.filters.isAdmin import IsAdmin
 from src.handlers.admin_handlers.state_handlers.router import router
 from src.states.admin_states.change_course import ChangeCourseState
 
 
-@router.message(ChangeCourseState.waiting_for_rub_usdt)
+@router.message(ChangeCourseState.waiting_for_rub_usdt, IsAdmin())
 async def waiting_for_rub_usdt(message: Message, state: FSMContext):
     exchange_settings = ExchangeSettings.get()
     try:
@@ -21,7 +22,7 @@ async def waiting_for_rub_usdt(message: Message, state: FSMContext):
         return
 
 
-@router.message(ChangeCourseState.waiting_for_thb_usdt)
+@router.message(ChangeCourseState.waiting_for_thb_usdt, IsAdmin())
 async def waiting_for_thb_usdt(message: Message, state: FSMContext):
     exchange_settings = ExchangeSettings.get()
     try:
