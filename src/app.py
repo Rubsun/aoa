@@ -38,7 +38,7 @@ async def start_polling():
 
     scheduler.add_job(
         update_exchange_rates,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(minutes=10),
         id='exchange_rate_update',
         replace_existing=True
     )
